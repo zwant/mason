@@ -13,14 +13,10 @@ defmodule Mason.Web.Router do
     plug :accepts, ["json"]
   end
 
-  scope "/", Mason.Web do
-    pipe_through :browser # Use the default browser stack
+  scope "/api", Mason.Web, as: :api do
+    pipe_through :api
 
-    get "/", PageController, :index
+    post "/commands", API.CommandController, :dispatch
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", Mason.Web do
-  #   pipe_through :api
-  # end
 end

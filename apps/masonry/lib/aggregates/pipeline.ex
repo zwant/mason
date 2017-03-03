@@ -3,77 +3,71 @@ defmodule Mason.Masonry.Pipeline do
   """
 
   defstruct [
-    challenge_uuid: nil,
-    name: nil,
-    description: nil,
-    start_date: nil,
-    start_date_local: nil,
-    challenge_state: nil,
-    # ...
+    pipeline_uuid: nil,
+    start_timestamp: nil,
+    finish_timestamp: nil,
+    pipeline_state: nil,
+    pipeline_result: nil
   ]
 
-  alias SegmentChallenge.Commands.{
-    CreateChallenge,
-    IncludeCompetitorsInChallenge,
-    HostChallenge,
-    StartChallenge,
-    EndChallenge,
+  alias Mason.Commands.{
+    StartPipeline,
+    FinishPipeline,
+    StartBuild,
+    FinishBuild
   }
 
-  alias SegmentChallenge.Events.{
-    ChallengeCreated,
-    CompetitorsJoinedChallenge,
-    ChallengeHosted,
-    ChallengeStarted,
-    ChallengeEnded,
+  alias Mason.Events.{
+    PipelineStarted,
+    PipelineFinished,
+    BuildStarted,
+    BuildFinished
   }
 
-  alias SegmentChallenge.Challenges.Challenge
+  alias Mason.Masonry.Pipeline
 
   @doc """
-  Create a new challenge
+  Start the pipeline, marking it as currently running
   """
-  def create_challenge(challenge, create_challenge)
+  def start_pipeline(pipeline, start_pipeline)
 
-  def create_challenge(%Challenge{challenge_state: nil}, %CreateChallenge{} = create_challenge) do
-    %ChallengeCreated{
-      challenge_uuid: create_challenge.challenge_uuid,
-      name: create_challenge.name,
-      description: create_challenge.description,
-      # ...
-    }
+  def start_pipeline(%Pipeline{pipeline_state: nil}, %StartPipeline{} = start_pipeline) do
+     %PipelineStarted{
+       pipeline_uuid: start_pipeline.pipeline_uuid,
+       start_timestamp: start_pipeline.start_timestamp
+     }
   end
 
-  def create_challenge(%Challenge{}, %CreateChallenge{}), do: {:error, :challenge_already_created}
+  def start_pipeline(%Pipeline{pipeline_state: :running} = pipeline, %StartPipeline{}), do {:error, :pipeline_already_running}
 
   @doc """
-  Start the challenge, making it active
+  Complete the pipeline, marking it as finished
   """
-  def start_challenge(challenge, start_challenge)
+  def finish_pipeline(pipeline, finish_pipeline)
 
-  def start_challenge(%Challenge{challenge_uuid: challenge_uuid, challenge_state: :approved} = challenge, %StartChallenge{}) do
-    %ChallengeStarted{
-      challenge_uuid: challenge_uuid,
-      start_date: challenge.start_date,
-      start_date_local: challenge.start_date_local,
+  def finish_pipeline(%Pipeline{pipeline_state: :running}, %FinishPipeline{} = finish_pipeline) do
+     %PipelineFinished{
+       pipeline_uuid: finish_pipeline.pipeline_uuid,
+       finish_timestamp: finish_pipeline.finish_timestamp,
+       result: finish_pipeline.result
+     }
+  end
+
+  def finish_pipeline(%Pipeline{}, %FinishPipeline{}), do {:error, :pipeline_not_started}
+
+  def apply(%Pipeline{} = pipeline, %PipelineStarted{pipeline_uuid: pipeline_uuid, start_timestamp: start_timestamp}) do
+    %Pipeline{pipeline |
+      pipeline_uuid: pipeline_uuid,
+      start_timestamp: start_timestamp,
+      pipeline_state: :running
     }
   end
 
-  def start_challenge(%Challenge{}, %StartChallenge{}), do: {:error, :challenge_not_approved}
-
-  def apply(%Challenge{} = challenge, %ChallengeCreated{challenge_uuid: challenge_uuid, name: name, description: description}) do
-    %Challenge{challenge |
-      challenge_uuid: challenge_uuid,
-      name: name,
-      description: description,
-      challenge_state: :created,
-      # ...
-    }
-  end
-
-  def apply(%Challenge{} = challenge, %ChallengeStarted{}) do
-    %Challenge{challenge |
-      challenge_state: :active,
+  def apply(%Pipeline{} = pipeline, %PipelineFinished{pipeline_uuid: pipeline_uuid, finish_timestamp: finish_timestamp, result: result}) do
+    %Pipeline{pipeline |
+      finish_timestamp: finish_timestamp,
+      pipeline_state: :finished,
+      pipeline_result: result
     }
   end
 end
